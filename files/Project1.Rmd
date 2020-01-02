@@ -1,0 +1,171 @@
+---
+title: "project 1"
+output: pdf_document
+author: Nan Yang, Crystal Liu, Sukyoung Cho
+---
+
+Q: 1. How to clean up data (i.e. are some measurements incorrect? )
+2. How measurements are taken (e.g. units, precision, etc.)
+3. Any odd individuals in the data?
+4. General demographic information (e.g. age group, height range, etc.)
+
+# Read Body Fat data and analyze (created by Nan Yang)
+```{r}
+# reviewed by Crystal Liu and Sukyoung Cho
+BodyFat = read.csv("BodyFat.csv") #Read data into R
+attach(BodyFat)
+dim(BodyFat)
+colnames(BodyFat)
+```
+
+#Step 1: Analyzing Data
+
+## Raw data
+ Before creating a model, we tried to examine the raw data in order to discover anything significant. (e.g. precision, units of measurement, outliers, general patterns, and others)
+
+```{r}
+head(BodyFat) #Look at the first few data points 
+tail(BodyFat) #Look at the last few data points
+summary(BodyFat)
+```
+
+## Visualization of Data (by Nan Yang)
+ As we discovered some suspicious data by looking at the summary, such as 0 body fat, we wanted to further examine the data by visualization. To figure out if there is any specific pattern or there is any outlier, and so forth.
+```{r}
+# reviewed by Crystal Liu and Sukyoung Cho
+par(mfrow=c(2,2)) #Makes a two-by-two, i.e. (2,2), plotting window
+par(mgp=c(1.8,.5,0), mar=c(3,3,1,1))
+
+hist(BODYFAT,breaks=30,
+     main="Histogram of Body Fat %",xlab="Body Fat %")
+
+hist(HEIGHT,breaks=30,
+     main="Histogram of Height",xlab="Height (inches)")
+
+hist(WEIGHT,breaks=30,
+     main="Histogram of Weight",xlab="Weight (lbs)")
+
+hist(ABDOMEN,breaks=30,
+     main="Histogram of Abdomen circumference",xlab="Abdomen circumference (cm)")
+```
+
+## Data cleaning (by Nan Yang)
+ We could clearly observe some outliers far apart from other individuals. In addition, we also found 0 body fat percent which is an error in the data, since no man can have 0 body fat. Hence, we decided to clean up the data before we build our model not only to increase the accuracy but also the reliability. We decided to remove three data points: one with 0 body fat, another with 363.1 lbs weight, and the other with 29.50 inches tall.
+
+```{r}
+# reviewed by Crystal Liu and Sukyoung Cho
+newBodyFat <- BodyFat[BODYFAT != 0 & WEIGHT < 360 & HEIGHT > 30 ,] # Filtering the data
+dim(newBodyFat) # To check if the data is cleaned
+attach(newBodyFat) # re-attach to use this data set.
+```
+
+# 2. Statistical Modeling and Analysis
+
+## Choose the best predictor (by Crystal Liu)
+```{r}
+# reviewed by Nan Yang and Sukyoung Cho
+mlm.bodyfat <- lm(BODYFAT ~ AGE + WEIGHT + HEIGHT + ADIPOSITY + NECK + CHEST + ABDOMEN + HIP + THIGH + KNEE + ANKLE + BICEPS + FOREARM + WRIST) # to decide which factor has the most influence on body fat
+summary(mlm.bodyfat)
+
+# scattter plot
+library(ggplot2)
+
+ggplot(data = newBodyFat, aes(x = ABDOMEN, y = BODYFAT)) + 
+  geom_point(color = 'dark blue') + 
+  geom_smooth(method = "lm", se = F)  + xlab("ABDOMEN SIZE(CM)") + ylab("Body Fat %")
+
+#ggplot(data = newBodyFat, aes(x = HEIGHT, y = BODYFAT)) + 
+#  geom_point(color = 'dark blue') + 
+#  geom_smooth(method = "lm", se = F)  + xlab("Height") + ylab("Body Fat %")
+```
+ The abdomen seemed to be the most convincing predictor not only by looking at the scatter plot but also the statistics from linear model with all measurements as 'x' and a body fat as 'y' - having the highest t-score.
+ 
+## Build a simple linear model with abdomen size as x (by Crystal Liu)
+```{r}
+# reviewed by Nan Yang and Sukyoung Cho
+lmmodel <- lm(BODYFAT ~ ABDOMEN)
+summary(lmmodel)
+```
+
+ Suppose the null hypothesis is that abdomen is (linearly) unrelated to body fat %, i.e. $$H_0:\beta_1=0$$, and the alternative is that it isn't, i.e.  $$H_1:\beta_1 \neq 0$$. The associated p-value is $$2.2 * 10^{-16}$$.
+
+ We can validate that there is a linear relationship between abdomen and body fat %. However, our conclusion carries a 5% error rate where we may have falsely declared that a body fat has linear relationship abdomen size even though they are not in a linear relationship.
+
+```{r}
+confint(lmmodel)
+```
+
+Correspondingly, the 95% confidence interval for the slope is  (0.56, 0.67) and the intercept is (-42.99, -32.99). In other words, we are 95% confident that the interval  (0.56, 0.67) contains the true slope value, $$\beta_1$$.  According to the confidence interval, we can also conclude the slope is statistically significant as the interval does not contain 0.
+
+According to our SLR model, if we want to use abdomen circumference (cm) to predict body fat %, we can use the equation:
+
+(Body Fat %)= -37.99 + 0.616Abdomen
+
+
+```{r}
+predict(lmmodel,newdata=data.frame(ABDOMEN=100),interval="predict")
+```
+
+ For example, for a male with abdomen circumference of 100 cm, his predicted body fat % percentage would be around 23.60%. There is a 95% probability that his body fat is between 14.98% and 32.21%.
+
+Observation 1: Abdomen explains about 67.25% of the variation in body fat % (based on $$R^2$$)
+Observation 2: Every increase of 1 cm in abdomen size, men gain, on average, 0.616% of body fat %.
+
+
+
+# 3. Diagnostics (Created by Sukyoung Cho)
+
+After building a linear model, we need to diagnose our simple linear regression assumptions with a residual plot and a QQ plot.
+Residual plot is to diagnose (i) linearity vioations, (ii) homoskedasticity violations, and (iii) detecting outliers
+QQ plot is to diagnose violations to Normality
+
+
+##Residual plot (Homoskedasticity)
+```{r}
+# reviewed by Nan Yang and Crystal Liu
+par(mfrow = c(1,1))
+plot(predict(lmmodel),rstandard(lmmodel),pch=23,bg="red",cex=1.2,
+    xlab="Predicted Body Fat %", ylab="Standardized Residuals",main="Standardized Residual Plot")
+abline(a=0,b=0,col="black",lwd=3)
+
+plot(ABDOMEN,resid(lmmodel),pch=23,bg="red",cex=1.2,
+    xlab="Abdomen", ylab="Residuals",main="Residual Plot")
+abline(a=0,b=0,col="black",lwd=3)
+```
+
+##QQ- plot (Normality)
+```{r}
+# reviewed by Nan Yang and Crystal Liu
+qqnorm(rstandard(lmmodel),pch=23,bg="red",cex=1.2)
+abline(a=0,b=1,col="black",lwd=3)
+```
+
+We should also check for influential points and outliers.
+For influential points, we will use both the Cook's distance and the $$p_{ii}$$ measures.
+For outliers, we can go back to the residual plot and see if there are any points that are suspiciously larger than it should be for the SLR model.
+
+```{r}
+# reviewed by Nan Yang and Crystal Liu
+pii = hatvalues(lmmodel)
+cooki = cooks.distance(lmmodel)
+
+par(mfrow = c(2,1))
+n = dim(newBodyFat)[1]
+plot(1:n,pii,type="p",pch=23,bg="red",cex=1.2,
+     xlab="Index (Each Observation)",ylab="Pii",main="Influence Values (Pii)")
+plot(1:n,cooki,type="p",pch=23,bg="red",cex=1.2,
+     xlab="Index (Each Observation)",ylab="Cook's Distance",main="Influence Values (Cook's Distance)")
+```
+
+Our Proposed SLR Model: if we want to use abdomen to predict body fat %: (Body Fat %)= -37.99 + 0.616Abdomen intercept, $$\beta_0$$, is -37.99= -38. slope = $$\beta_1$$ = 0.61589 = 0.6.
+
+ Possible rule of thumb: "multiply your abdomen by 0.6 and subtract 38"
+
+
+ Side Note 1: This rule of thumb is close to our estimated model by constructing 95% confidence intervals of the slope and the intercept.
+
+ Example Usage: for a male with abdomen circumference of 100 cm, his predicted body fat % percentage would be around 23.60%. There is a 95% probability that his body fat is between 14.98% and 32.21%.
+
+ With the rule of thumb, you get about 22.0% as the predicted body fat %.
+
+ Inference about Relationship: There is clearly a linear relationship between abdomen and body fat % and this relationship is significant at the $$\alpha$$=0.05 level (with p-value $$2.2 * 10^{-16}$$). However, age only explains about 8.4% of all the variation in body fat %.
